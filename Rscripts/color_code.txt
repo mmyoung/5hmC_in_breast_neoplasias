@@ -1,0 +1,26 @@
+Stage:
+UTH #1f70a9
+ADH #83639f
+DCIS #c22f2f
+IDC #ffd166
+
+Genomic region:
+Promoter(0-1kb) #1f70a9
+Promoter(1-2kb) #65a9d7
+Exon #ea7827
+5'UTR #c22f2f
+3'UTR #449945
+Intron #83639f
+Downstream(<=300bp) #adb5bd
+Distal Intergenic #6c757d
+
+Adjecent stage comparison:
+I
+up
+down
+II
+up
+down
+III
+up
+down

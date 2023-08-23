@@ -40,6 +40,7 @@ data_dir <- "E:\\20220921-WSL-5hmc\\data\\RNAseq_data"
 
 ## Get needed data for peak annotation
 txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+normalized_count_df <- readRDS(paste0(data_dir,"//normalized_count_df.rds"))
 
 genebody <- getBioRegion(TxDb = txdb,
                          by = "gene",
@@ -51,7 +52,7 @@ get_TagMat <-
     first_TagMat <- 
       getTagMatrix(GRanges(peak_file[which(peak_file[,"group"]==group),]),
                    windows = genebody, nbin = 800,
-                   upstream = 1000,downstream = 1000)
+                   upstream = 3000,downstream = 3000)
     ss <- colSums(first_TagMat)
     ss <- ss/sum(ss)
     freq_df <- 
@@ -69,20 +70,21 @@ plot_RNA_group_Tagcov <-
     # get gene ids in each quantile group
     RNA_expr_nor <- 
       RNA_expr_nor %>%
-        filter(!value==0)
-    AW_quan <- quantile(RNA_expr_nor$value,probs=c(0,0.25,0.5,0.75,1),na.rm=T,names=T)
+        filter(!value==0) %>%
+      mutate(quantile_group=ntile(value,3))
+    
     first_group <- 
       row.names(RNA_expr_nor)[
-        RNA_expr_nor$value>AW_quan['0%'] & RNA_expr_nor$value<=AW_quan['25%']]
+        RNA_expr_nor$quantile_group==1]
     second_group <- 
       row.names(RNA_expr_nor)[
-        RNA_expr_nor$value>AW_quan['25%'] & RNA_expr_nor$value<=AW_quan['50%']]
+        RNA_expr_nor$quantile_group==2]
     third_group <- 
       row.names(RNA_expr_nor)[
-        RNA_expr_nor$value>AW_quan['50%'] & RNA_expr_nor$value<=AW_quan['75%']]
+        RNA_expr_nor$quantile_group==3]
     forth_group <- 
       row.names(RNA_expr_nor)[
-        RNA_expr_nor$value>AW_quan['75%'] & RNA_expr_nor$value<=AW_quan['100%']]
+        RNA_expr_nor$quantile_group==4]
     
     # load annotated peak file
     peak_anno<- 
@@ -94,22 +96,23 @@ plot_RNA_group_Tagcov <-
       peak_anno %>%
       mutate(group = case_when(ENSEMBL %in% first_group ~ "first",
                               ENSEMBL %in% second_group ~ "second",
-                              ENSEMBL %in% third_group ~ "third",
-                              ENSEMBL %in% forth_group ~ "forth"
+                              ENSEMBL %in% third_group ~ "third"
       ))
     print(table(peak_anno$group))
     total_TagMat <- 
-      do.call(rbind,lapply(c("first","second","third","forth"),
+      do.call(rbind,lapply(c("first","second","third"),
                            get_TagMat,peak_file=peak_anno))
-    total_TagMat$group <- factor(total_TagMat$group,levels=c("first","second","third","forth")) 
+    total_TagMat$group <- factor(total_TagMat$group,
+                                 levels=c("first","second","third")) 
     p <- 
       ggplot(total_TagMat,aes(pos,Peak_count_freq,color=group))+
       geom_line()+
-      geom_vline(xintercept = c(80,880),linetype=2)+
-      scale_color_manual(values = c("#ff595e","#ffca3a","#1982c4","#8ac926"))+
-      scale_x_continuous(name = "",
-                         breaks = c(0,80,280,480,680,880,960),
-                         labels = c("-1Kb","TSS","25%","50%","75%","TES","+1Kb"))+
+      geom_vline(xintercept = c(240,1040),linetype=2)+
+      #scale_color_manual(values = c("#ff595e","#ffca3a","#1982c4","#8ac926"))+
+      scale_color_manual(values = c("#ff595e","#ffca3a","#1982c4"))+
+      scale_x_continuous(name = "", expand = c(0,0),
+                         breaks = c(0,240,440,640,840,1040,1280),
+                         labels = c("-3Kb","TSS","25%","50%","75%","TES","+3Kb"))+
       scale_y_continuous(name = "peak count frequency",
                          labels = function(x) format(x, scientific = TRUE))+
       labs(title=sample_name)+
@@ -121,7 +124,6 @@ plot_RNA_group_Tagcov <-
            width=13, height=8) 
   }
 
-normalized_count_df <- loadRDS(paste0(data_dir,"//normalized_count_df.rds"))
 peak_dir <- "E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\"
 for(i in colnames(normalized_count_df)){
   for(j in c("H","M")){

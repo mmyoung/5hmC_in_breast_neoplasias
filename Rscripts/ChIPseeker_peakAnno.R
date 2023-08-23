@@ -1,6 +1,9 @@
 library(ChIPseeker)
 library(TxDb.Hsapiens.UCSC.hg19.knownGene)
 library(stringr)
+library(dplyr)
+library(ggrastr)
+library(ggplot2)
 txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
 
 ## annotate the diff peak analysis results
@@ -76,13 +79,20 @@ library(ggplot2)
 p_5mC <- 
 ggplot(sample_5mC_df,aes(x=group,y=log1p(SignalValue),fill=group))+
   #geom_violin(width=0.7)+
-  geom_boxplot()+
+  geom_boxplot(outlier.color = "NA")+
   labs(title="5mC level",x="")+
-  scale_fill_brewer(palette = "Dark2")+
+  scale_y_continuous(limits = c(0.75,2.5))+
+  scale_fill_manual(values = c("UDH"="#1f70a9",
+                               "ADH"="#83639f",
+                               "DCIS"="#c22f2f"))+
   theme_bw()+
   theme(plot.title = element_text(hjust = 0.5,vjust = 0.5,size = 12),
         axis.text = element_text(size = 11,colour = "black"),
         legend.position = "None")
+p_5mC
+ggsave(p_5mC,
+       filename = "E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\5mC_stage_boxplot.pdf",
+       width = 5,height = 4)
 
 
 sample_5hmC_df <- data.frame()
@@ -102,16 +112,23 @@ sample_5hmC_df <-
   mutate(group=factor(group,levels=c("UDH","ADH","DCIS","PT")))
 p_5hmC <- 
 ggplot(sample_5hmC_df,aes(x=group,y=log1p(SignalValue),fill=group))+
-  geom_boxplot(width=0.7)+
+  geom_boxplot(width=0.7,outlier.color = "NA")+
+  scale_y_continuous(limits = c(1,2.5))+
   labs(title="5hmC level",x="")+
-  scale_fill_brewer(palette = "Dark2")+
+  scale_fill_manual(values = c("UDH"="#1f70a9",
+                               "ADH"="#83639f",
+                               "DCIS"="#c22f2f",
+                               "PT"="#ffd166"))+
   theme_bw()+
   theme(plot.title = element_text(hjust = 0.5,vjust = 0.5,size = 12),
         axis.text = element_text(size = 11,colour = "black"),
         legend.position = "None")
-library(ggpubr)
-p <- ggarrange(p_5mC,p_5hmC,ncol = 2)
-ggsave(p,filename = "E:\\20220921-WSL-5hmc\\analysis\\5hmC_5mC_boxplot.pdf",width = 10,height = 7)
+ggsave(p_5hmC,
+       filename = "E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\5hmC_stage_boxplot.pdf",
+       width = 5,height = 4)
+# library(ggpubr)
+# p <- ggarrange(p_5mC,p_5hmC,ncol = 2)
+# ggsave(p,filename = "E:\\20220921-WSL-5hmc\\analysis\\5hmC_5mC_boxplot.pdf",width = 10,height = 7)
 
 ## plot the average plot for all peaks
 dir.create("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\average_plot")
@@ -249,3 +266,85 @@ pdf("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\AllStage_5hmC_heamta
     width = 8,height = 6)
 draw(ht,annotation_legend_list = list(lgd))
 dev.off()
+
+## plot the 5hmC levels in each genomic region separately
+library(dplyr)
+library(stringr)
+peak_FE_df <- data.frame()
+for (diff_res in list.files(out_path,pattern = "anno$",full.names = TRUE)){
+  base_name <- str_split(basename(diff_res),"_",simplify = T)[1]
+  tmp_df <- read.table(diff_res,header = T,sep = "\t",comment.char = "",quote = "\"") %>%
+    mutate(group=ifelse(grepl("^Intron",annotation),"Intron",
+                        ifelse(grepl("^Exon",annotation),"Exon",annotation))) %>%
+    mutate(sample=!!base_name) %>%
+    select(group,V7,sample)
+    
+  peak_FE_df <- rbind(peak_FE_df,tmp_df)
+}
+
+peak_FE_df <- 
+  peak_FE_df %>%
+  mutate(stage=case_when(grepl(paste(c("A10","A2","AW"),collapse = "|"),sample) ~ "ADH",
+                         grepl(paste(c("D10","D20","D3"),collapse = "|"),sample) ~ "DCIS",
+                         grepl(paste(c("J","U3","U5"),collapse = "|"),sample) ~ "UDH",
+                         grepl(paste(c("PT3","PT5","PT6","PT7"),collapse = "|"),sample) ~ "IDC"
+  )) %>%
+  mutate(stage=factor(stage,levels=c("UDH","ADH","DCIS","IDC")))
+saveRDS(peak_FE_df,
+        file = "E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\stage_sample_region_FE.rds")
+peak_FE_df <- readRDS("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\stage_sample_region_FE.rds")
+
+library(ggplot2)
+plot_box_compare <-
+  function(tmp_region){
+    p<-
+  ggplot(peak_FE_df[peak_FE_df$group==tmp_region &
+                      grepl("H",peak_FE_df$sample),],
+         aes(x=stage,y=V7,fill=stage))+
+    geom_boxplot()+
+    labs(title=tmp_region)+
+    #facet_wrap(group~.,scales = "free")+
+    scale_y_continuous(name = "Fold Enrichment",
+                       limits = c(1,7),breaks = c(1,3,5,7))+
+    scale_x_discrete(name="")+
+    scale_fill_manual(values = c("#1f70a9","#83639f","#c22f2f","#ffd166"))+
+    theme_bw()+
+    theme(panel.grid = element_blank(),legend.position = "NA",
+          axis.text = element_text(size = 9,colour = "black"),
+          plot.title = element_text(hjust = 0.5,vjust = 0.5,size = 12))
+      ggsave(p,filename = paste0("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\Sample_compare_region\\",
+                               str_replace(tmp_region,"<|=",""),".pdf"),
+             width = 5,height = 4)
+}
+lapply(unique(peak_FE_df$group),plot_box_compare)
+
+##5mC
+library(ggplot2)
+library(stringr)
+plot_box_compare <-
+  function(tmp_region){
+    p<-
+      ggplot(peak_FE_df[peak_FE_df$group==tmp_region &
+                          grepl("M",peak_FE_df$sample),],
+             aes(x=stage,y=V7,fill=stage))+
+      geom_boxplot()+
+      labs(title=tmp_region)+
+      #facet_wrap(group~.,scales = "free")+
+      scale_y_continuous(name = "Fold Enrichment",
+                         limits = c(1,7),breaks = c(1,3,5,7))+
+      scale_x_discrete(name="")+
+      scale_fill_manual(values = c("#1f70a9","#83639f","#c22f2f"))+
+      theme_bw()+
+      theme(panel.grid = element_blank(),legend.position = "NA",
+            axis.text = element_text(size = 9,colour = "black"),
+            plot.title = element_text(hjust = 0.5,vjust = 0.5,size = 12))
+    ggsave(p,filename = paste0("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_peak_anno\\sample_5mC_compare_region\\",
+                               str_replace(tmp_region,"<|=",""),".pdf"),
+           width = 5,height = 4)
+  }
+lapply(unique(peak_FE_df$group),plot_box_compare)
+
+
+source("E:\\20220921-WSL-5hmc\\src\\.make_merged_5mC_peak_distribution.R")
+
+

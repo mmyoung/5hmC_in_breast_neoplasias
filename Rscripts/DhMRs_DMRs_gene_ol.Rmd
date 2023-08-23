@@ -1,0 +1,164 @@
+---
+title: "Overlap between DMRs and DhMRs"
+author: "Lin Yang"
+date: "2023/2/9"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(ChIPseeker)
+library(dplyr)
+library(ComplexHeatmap)
+```
+
+```{r}
+# Load all the annotated differential peaks, between adjacent stages
+setwd("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_diffPeak_anno")
+get_changed_gene <- 
+  function(compare_name){
+    anno_peak <- 
+      read.table(paste0(compare_name,"_H_diff_peak_deseq2.txt_anno"), 
+                 header = T,
+                 sep = "\t",
+                 comment.char = "",
+                 quote = "\"",
+                 stringsAsFactors = F)
+  
+   tmp_up_gene <- 
+     anno_peak %>%
+       filter(Fold<(-1) & p.value<0.05 & !is.na(SYMBOL)) %>%
+       pull(SYMBOL)
+           
+   tmp_down_gene <- 
+     anno_peak %>%
+       filter(Fold>1 & p.value<0.05 & !is.na(SYMBOL)) %>%
+       pull(SYMBOL)
+         
+   lst <- list(foldM1=tmp_up_gene,fold1=tmp_down_gene)
+  names(lst) = paste0(compare_name,c("_foldM1","_fold1"))
+    return(lst)
+  }
+
+DhMR_genes <-
+  lapply(c("UDH_ADH","ADH_DCIS","DCIS_PT"),
+       get_changed_gene)
+
+## organize the results into a simple list
+res_ls <- list()
+for(i in seq_along(DhMR_genes)){
+  res_ls <- append(res_ls,c(DhMR_genes[[i]][1],DhMR_genes[[i]][2]))
+}
+
+
+```
+
+make upset plot
+```{r}
+m = make_comb_mat(res_ls)
+pdf("E:\\20220921-WSL-5hmc\\analysis\\diff_peak_overlap\\DhMRs_upset.pdf",
+    width = 10,height = 5)
+UpSet(m, set_order=names(res_ls),
+      comb_order=order(comb_size(m)),
+      pt_size = unit(3, "mm"), lwd = 3,
+           right_annotation = rowAnnotation(
+             "Set size" = anno_barplot(set_size(m), 
+                                       bar_width = 0.6,
+                                       border = T, 
+                                       gp = gpar(fill = "#1B2631", 
+                                                 col = "white"), 
+                                       width = unit(2, "cm")))
+      )
+dev.off()
+```
+According to the overlap results, extract the top two largest gene list
+```{r}
+## DCIS_PT_foldM1 specific genes
+DCIS_PT_up <- extract_comb(m,"000010")
+
+## overlap among UDH_ADH_fold1, ADH_DCIS_fold1, DCIS_PT_foldM1 
+continuous_change <- extract_comb(m,"010110")
+
+write.table(data.frame(DCIS_PT_up=DCIS_PT_up),
+            file = "E:\\20220921-WSL-5hmc\\analysis\\diff_peak_overlap\\DCIS_PT_up.txt",
+            quote=F,sep = "\t",
+            row.names = F)
+write.table(data.frame(continuous_change=continuous_change),
+            file = "E:\\20220921-WSL-5hmc\\analysis\\diff_peak_overlap\\continuous_change.txt",
+            quote=F,sep = "\t",
+            row.names = F)
+
+library(clusterProfiler)
+library(org.Hs.eg.db)
+DCIS_PT_up_GO <- 
+  enrichGO(DCIS_PT_up,
+           OrgDb = org.Hs.eg.db,
+           ont = "BP",
+           keyType = "SYMBOL")
+DCIS_PT_up_KEGG <-
+  enrichKEGG(DCIS_PT_up)
+
+```
+
+
+Only focus on genes that have DhMRs in its promoter region
+```{r}
+setwd("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_diffPeak_anno")
+get_changed_gene <- 
+  function(compare_name){
+    anno_peak <- 
+      read.table(paste0(compare_name,"_H_diff_peak_deseq2.txt_anno"), 
+                 header = T,
+                 sep = "\t",
+                 comment.char = "",
+                 quote = "\"",
+                 stringsAsFactors = F)
+  
+   tmp_up_gene <- 
+     anno_peak %>%
+     filter(Fold<(-1) & p.value<0.05 & !is.na(SYMBOL)) %>%
+     filter(grepl("Promoter",annotation)) %>%
+     pull(SYMBOL)
+           
+   tmp_down_gene <- 
+     anno_peak %>%
+     filter(Fold>1 & p.value<0.05 & !is.na(SYMBOL)) %>%
+     filter(grepl("Promoter",annotation)) %>%
+     pull(SYMBOL)
+         
+   lst <- list(foldM1=tmp_up_gene,fold1=tmp_down_gene)
+   names(lst) = paste0(compare_name,c("_foldM1","_fold1"))
+   return(lst)
+  }
+
+DhMR_genes <-
+  lapply(c("UDH_ADH","ADH_DCIS","DCIS_PT"),
+       get_changed_gene)
+
+## organize the results into a simple list
+res_ls <- list()
+for(i in seq_along(DhMR_genes)){
+  res_ls <- append(res_ls,c(DhMR_genes[[i]][1],DhMR_genes[[i]][2]))
+}
+```
+
+```{r}
+m = make_comb_mat(res_ls)
+pdf("E:\\20220921-WSL-5hmc\\analysis\\diff_peak_overlap\\DhMRs_promoter_upset.pdf",
+    width = 10,height = 5)
+UpSet(m, set_order=names(res_ls),
+      comb_order=order(comb_size(m)),
+      pt_size = unit(3, "mm"), lwd = 3,
+           right_annotation = rowAnnotation(
+             "Set size" = anno_barplot(set_size(m), 
+                                       bar_width = 0.6,
+                                       border = T, 
+                                       gp = gpar(fill = "#1B2631", 
+                                                 col = "white"), 
+                                       width = unit(2, "cm")))
+      )
+dev.off()
+```
