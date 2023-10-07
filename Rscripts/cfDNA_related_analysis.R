@@ -87,8 +87,11 @@ library(stringr)
 cfDNA_dir <- "E:\\20220921-WSL-5hmc\\data\\cfDNA"
 tumorDNA_dir <- "E:\\20220921-WSL-5hmc\\data\\sample_peak"
 
-hmC_file_ls <- c(list.files(cfDNA_dir,pattern = "^[bh].*narrowPeak$",full.names = TRUE),
-list.files(tumorDNA_dir,pattern = "^[UPJ].*H.*narrowPeak$",full.names = TRUE))
+# hmC_file_ls <- c(list.files(cfDNA_dir,pattern = "^[bh].*narrowPeak$",full.names = TRUE),
+# list.files(tumorDNA_dir,pattern = "^[UPJ].*H.*narrowPeak$",full.names = TRUE))
+
+#hmC_file_ls <- list.files(cfDNA_dir,pattern = "^[bh].*narrowPeak$",full.names = TRUE)
+hmC_file_ls <- list.files(tumorDNA_dir,pattern = "^[UPJ].*H.*narrowPeak$",full.names = TRUE)
 
 tmp_res <-
   lapply(hmC_file_ls,
@@ -118,22 +121,35 @@ tmp <- do.call(rbind,lapply(tmp_res,function(x){data.frame(x)})) %>%
 unique(tmp$group)
 
 library(ggplot2)
+# tmp$group <- factor(tmp$group,
+#                     levels = c("UDH","PT","healthy","breast"),
+#                     labels = c("UDH","PT","cf-Normal","cf-cancer"))
+# tmp$group <- factor(tmp$group,
+#                     levels = c("healthy","breast"),
+#                     labels = c("cf-Normal","cf-cancer"))
 tmp$group <- factor(tmp$group,
-                    levels = c("UDH","PT","healthy","breast"),
-                    labels = c("UDH","PT","cf-Normal","cf-cancer"))
+                    levels = c("UDH","PT"),
+                    labels = c("UDH","PT"))
+
+t.test(V7~group,tmp) 
+
 p <- 
 ggplot(tmp,aes(x=group,y=log2(V7),fill=group))+
-  geom_violin(adjust=2.5)+
-  geom_boxplot(width=0.1)+
-  scale_y_continuous(limits = c(0.5,3.8))+
-  labs(x="",y="log2(5hmC fold enrichment)")+
-  scale_fill_brewer(palette = "Paired")+
+  #geom_violin(adjust=2.5)+
+  geom_boxplot(outlier.colour = NA)+
+  scale_y_continuous(limits = c(1,3))+
+  labs(x="",y="log2(5hmC fold enrichment)",title = "P <2.2e-16")+
+  scale_fill_manual(values=brewer.pal(4,"Paired")[3:4])+
   theme_bw()+
   theme(panel.grid = element_blank(),
         legend.position = "NA",
         axis.text = element_text(size = 12,color = "black"),
         axis.title = element_text(size=14,colour = "black"))
-ggsave(p,filename = paste0(out_path,"\\cfDNA_UDH_PT_5hmC_violin_plot.pdf"),width = 5,height = 4)
+#ggsave(p,filename = paste0(out_path,"\\cfDNA_UDH_PT_5hmC_violin_plot.pdf"),width = 5,height = 4)
+#ggsave(p,filename = paste0(out_path,"\\cfDNA_5hmC_violin_plot.pdf"),width = 5,height = 4)
+ggsave(p,filename = paste0(out_path,"\\UDH_PT_5hmC_violin_plot.pdf"),width = 5,height = 4)
+
+
 ## compare the mean value of cf-Normal and cf-cancer
 mean(tmp[which(tmp$group=="cf-Normal"),"V7"],na.rm=T)-mean(tmp[which(tmp$group=="cf-cancer"),"V7"],na.rm = T)
 
@@ -142,30 +158,34 @@ mean(tmp[which(tmp$group=="cf-Normal"),"V7"],na.rm=T)-mean(tmp[which(tmp$group==
 library(GenomicRanges)
 library(dplyr)
 UDH_PT_Fold1 <- 
-  read.table("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_diffPeak_anno\\UDH_PT_H_diff_peak_deseq2.txt_anno",
-           header = T,stringsAsFactors = T, sep = "\t", 
+  #read.table("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_diffPeak_anno\\UDH_PT_H_diff_peak_deseq2.txt_anno",
+  read.table("/Users/linyang/.mounty/Seagate Expansion Drive/电脑备份/E盘/20220921-WSL-5hmc/analysis/ChIPseeker_diffPeak_anno/UDH_PT_H_diff_peak_deseq2.txt_anno",
+          header = T,stringsAsFactors = T, sep = "\t", 
            comment.char = "",quote = "\"") %>%
   filter(Fold>1 & p.value<0.05) %>%
   makeGRangesFromDataFrame(keep.extra.columns = T)
 
 UDH_PT_FoldM1 <- 
-  read.table("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_diffPeak_anno\\UDH_PT_H_diff_peak_deseq2.txt_anno",
-             header = T,stringsAsFactors = T, sep = "\t", 
+  #read.table("E:\\20220921-WSL-5hmc\\analysis\\ChIPseeker_diffPeak_anno\\UDH_PT_H_diff_peak_deseq2.txt_anno",
+  read.table("/Users/linyang/.mounty/Seagate Expansion Drive/电脑备份/E盘/20220921-WSL-5hmc/analysis/ChIPseeker_diffPeak_anno/UDH_PT_H_diff_peak_deseq2.txt_anno", 
+            header = T,stringsAsFactors = T, sep = "\t", 
              comment.char = "",quote = "\"") %>%
   filter(Fold<(-1) & p.value<0.05) %>%
   makeGRangesFromDataFrame(keep.extra.columns = T)
 
 
 cfDNA_Fold1 <-
-  read.table("E:\\20220921-WSL-5hmc\\analysis\\cfDNA_peak_anno\\cfDNA_diff_5hmC_ChIPseeker_anno.txt",
-           header = T,stringsAsFactors = T,
+  #read.table("E:\\20220921-WSL-5hmc\\analysis\\cfDNA_peak_anno\\cfDNA_diff_5hmC_ChIPseeker_anno.txt",
+  read.table("/Users/linyang/.mounty/Seagate Expansion Drive/电脑备份/E盘/20220921-WSL-5hmc/analysis/cfDNA_peak_anno/cfDNA_diff_5hmC_ChIPseeker_anno.txt", 
+          header = T,stringsAsFactors = T,
            sep = "\t", comment.char = "",quote = "\"") %>%
   filter(Fold>1 & p.value<0.05) %>%
   makeGRangesFromDataFrame(keep.extra.columns = T)
 
 cfDNA_FoldM1 <-
-  read.table("E:\\20220921-WSL-5hmc\\analysis\\cfDNA_peak_anno\\cfDNA_diff_5hmC_ChIPseeker_anno.txt",
-             header = T,stringsAsFactors = T,
+  #read.table("E:\\20220921-WSL-5hmc\\analysis\\cfDNA_peak_anno\\cfDNA_diff_5hmC_ChIPseeker_anno.txt",
+  read.table("/Users/linyang/.mounty/Seagate Expansion Drive/电脑备份/E盘/20220921-WSL-5hmc/analysis/cfDNA_peak_anno/cfDNA_diff_5hmC_ChIPseeker_anno.txt", 
+            header = T,stringsAsFactors = T,
              sep = "\t", comment.char = "",quote = "\"") %>%
   filter(Fold<(-1) & p.value<0.05) %>%
   makeGRangesFromDataFrame(keep.extra.columns = T)
@@ -280,9 +300,20 @@ T_hypo_plot_mat <-
 cfDNA_hypo_plot_mat <- 
 as.matrix(as.data.frame(cfDNA_FoldM1)[as.data.frame(OL_Fold1)[["subjectHits"]],c("Conc_breast","Conc_healthy")])
 
+hypo_gene <- 
+  c("UNC5A","PIK3AP1","IGF1R","KLF15","PTPRG","PPARGC1B","ZFHX3")
+anno_index <- 
+ unlist(lapply(hypo_gene,function(x) which(x==T_hypo_peak$SYMBOL)))
+anno_label <- 
+  as.character(T_hypo_peak$SYMBOL[anno_index])
+
+
 library(ComplexHeatmap)
 library(circlize)
+
 col_fun <- colorRamp2(c(0,4,8),c("#435BF7","#F1D8D8","#E26666"))
+
+ha = rowAnnotation(foo=anno_mark(at=anno_index,labels = anno_label))
 ht1 = Heatmap(T_hypo_plot_mat, name = "Tumor",
               cluster_rows = F,
               show_row_names = F,
@@ -296,8 +327,10 @@ ht2 = Heatmap(cfDNA_hypo_plot_mat[,c("Conc_healthy","Conc_breast")], name = "cfD
               cluster_columns = F,
               column_labels = c("healthy","tumor"),
               column_names_rot = 0,
-              col = col_fun)
-pdf("E:\\20220921-WSL-5hmc\\analysis\\cfDNA_peak_anno\\tumor_cfDNA_hypo_5hmC_heatmap.pdf",
+              col = col_fun,
+              right_annotation = ha)
+#pdf("E:\\20220921-WSL-5hmc\\analysis\\cfDNA_peak_anno\\tumor_cfDNA_hypo_5hmC_heatmap.pdf",
+pdf("/Users/linyang/.mounty/Seagate Expansion Drive/电脑备份/E盘/20220921-WSL-5hmc/analysis/cfDNA_peak_anno/tumor_cfDNA_hypo_5hmC_heatmap.pdf",
     width = 5,height =7)  
 draw(ht1+ht2,
      column_title='hypo-5hmC')
@@ -309,6 +342,15 @@ T_hyper_plot_mat <-
 
 cfDNA_hyper_plot_mat <- 
   as.matrix(as.data.frame(cfDNA_Fold1)[as.data.frame(OL_FoldM1)[["subjectHits"]],c("Conc_breast","Conc_healthy")])
+
+hyper_gene <- 
+  c("HIF1A")
+anno_index <- 
+  unlist(lapply(hyper_gene,function(x) which(x==T_hyper_peak$SYMBOL)))
+anno_index
+anno_label <- 
+  as.character(T_hyper_peak$SYMBOL[anno_index])
+ha = rowAnnotation(foo=anno_mark(at=anno_index,labels = anno_label))
 
 ht1 = Heatmap(T_hyper_plot_mat, name = "Tumor",
               cluster_rows = F,
@@ -323,9 +365,11 @@ ht2 = Heatmap(cfDNA_hyper_plot_mat[,c("Conc_healthy","Conc_breast")], name = "cf
               cluster_columns = F,
               column_labels = c("healthy","tumor"),
               column_names_rot = 0,
-              col = col_fun)
-pdf("E:\\20220921-WSL-5hmc\\analysis\\cfDNA_peak_anno\\tumor_cfDNA_hyper_5hmC_heatmap.pdf",
-    width = 5,height =7)  
+              col = col_fun,
+              right_annotation = ha)
+#pdf("E:\\20220921-WSL-5hmc\\analysis\\cfDNA_peak_anno\\tumor_cfDNA_hyper_5hmC_heatmap.pdf",
+pdf("/Users/linyang/.mounty/Seagate Expansion Drive/电脑备份/E盘/20220921-WSL-5hmc/analysis/cfDNA_peak_anno/tumor_cfDNA_hyper_5hmC_heatmap.pdf", 
+   width = 5,height =7)  
 draw(ht1+ht2,
      column_title='hyper-5hmC')
 dev.off()
